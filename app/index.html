@@ -25,7 +25,8 @@
     <button class="rail-new" id="btn-restart">+ Nouvelle marque</button>
 
     <div class="rail-foot">
-      <span class="state" id="server-state">hors ligne</span>
+      <button class="rail-link" id="btn-settings">Réglages</button>
+      <span class="state" id="server-state">gabarits locaux</span>
     </div>
   </aside>
 
@@ -229,9 +230,57 @@
       </div>
     </section>
 
+    <section class="screen" id="s-settings">
+      <header class="sheet-head">
+        <div>
+          <span class="kicker">Réglages</span>
+          <h2>Modèle de langage</h2>
+          <p class="lede small">
+            Sans clé, l'app écrit avec ses gabarits. Avec une clé, les textes sont rédigés par le modèle.
+            La clé reste dans ce navigateur — elle n'est jamais envoyée à notre serveur.
+          </p>
+        </div>
+        <button class="ghost" id="btn-settings-back">← Retour</button>
+      </header>
+
+      <div class="sheet">
+        <section class="cell cell-wide">
+          <h3><span class="num">01</span> Fournisseur</h3>
+          <p class="cell-sub">Choisis celui dont tu as la clé.</p>
+          <div class="seg" id="provider-seg">
+            <button type="button" class="chip" data-provider="gemini">Gemini</button>
+            <button type="button" class="chip" data-provider="openai">OpenAI</button>
+            <button type="button" class="chip" data-provider="anthropic">Anthropic</button>
+          </div>
+        </section>
+
+        <section class="cell">
+          <h3><span class="num">02</span> Clé API</h3>
+          <p class="cell-sub" id="key-help">—</p>
+          <input id="key-input" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false">
+        </section>
+
+        <section class="cell">
+          <h3><span class="num">03</span> Modèle</h3>
+          <p class="cell-sub">Vide = modèle par défaut du fournisseur.</p>
+          <input id="model-input" type="text" placeholder="gemini-2.5-flash" spellcheck="false">
+        </section>
+
+        <section class="cell cell-wide">
+          <div class="settings-actions">
+            <button class="primary" id="btn-key-save">Enregistrer</button>
+            <button class="ghost" id="btn-key-test">Tester la clé</button>
+            <button class="ghost" id="btn-key-clear">Effacer</button>
+          </div>
+          <p class="log" id="key-status"></p>
+        </section>
+      </div>
+    </section>
+
   </main>
 </div>
 
+<script src="llm.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

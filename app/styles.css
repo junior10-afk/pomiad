@@ -210,7 +210,32 @@ body::before {
   border-top: 1px solid var(--line-soft);
   margin-top: 14px;
   padding: 12px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
 }
+
+.rail-link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-radius: 0;
+}
+.rail-link:hover { color: var(--accent); }
+
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.settings-actions .log { margin: 0 0 0 4px; }
 
 .state {
   display: inline-flex;
@@ -324,7 +349,7 @@ h3 {
 
 /* ---------- contrôles ---------- */
 
-input[type="text"], textarea {
+input[type="text"], input[type="password"], textarea {
   width: 100%;
   background: oklch(15% 0.012 110);
   border: 1px solid var(--line-soft);
@@ -337,9 +362,9 @@ input[type="text"], textarea {
   transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
 }
 
-input[type="text"]:hover, textarea:hover { border-color: var(--line); }
+input[type="text"]:hover, input[type="password"]:hover, textarea:hover { border-color: var(--line); }
 
-input[type="text"]:focus, textarea:focus {
+input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
   border-color: var(--accent-dim);
   background: oklch(17% 0.014 110);
 }

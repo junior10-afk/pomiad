@@ -132,6 +132,7 @@ async function handleAnalyze(body) {
       description: signals.description,
       colors: signals.colors.slice(0, 12).map((c) => c.hex),
       fonts: signals.fonts.slice(0, 4).map((f) => f.name),
+      text: signals.text.slice(0, 2500),
       stylesheets: signals.stylesheets,
       cssBytes: signals.cssBytes
     }

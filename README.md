@@ -15,7 +15,8 @@ node server/index.js
 Zéro dépendance npm, zéro build. Le serveur sert le front (`app/`) **et** l'API (`/api/*`).
 
 Sans `.env`, tout fonctionne en **mode local** : crawler réel, copie par gabarits, créas vectoriels.
-Avec une clé Gemini, le texte et les images passent par le modèle — voir **[SETUP.md](SETUP.md)**.
+Avec une clé, le texte passe par le modèle — soit collée dans **Réglages** (stockée dans le
+navigateur), soit dans `.env` côté serveur. Voir **[SETUP.md](SETUP.md)**.
 
 ## Architecture
 
@@ -23,12 +24,15 @@ Avec une clé Gemini, le texte et les images passent par le modèle — voir **[
 server/
   index.js    serveur HTTP, routes /api, statique
   crawl.js    crawler + extraction (couleurs hex/rgb/hsl/oklch, polices, texte, ton)
-  llm.js      abstraction Gemini / OpenAI / Anthropic (texte + image)
+  llm.js      abstraction Gemini / OpenAI / Anthropic côté serveur (clé .env)
   prompts.js  prompts produit (DNA, campagnes, édition, image)
   env.js      lecture de .env sans dépendance
 app/
-  index.html  styles.css  app.js   (vanilla JS, canvas, aucune dépendance)
+  index.html  styles.css  app.js  llm.js   (vanilla JS, canvas, aucune dépendance)
 ```
+
+`app/llm.js` est le client « bring your own key » : il appelle le fournisseur **depuis le
+navigateur**, avec la clé saisie dans les réglages. Le serveur ne voit jamais cette clé.
 
 ## Interface
 

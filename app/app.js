@@ -797,27 +797,29 @@
     }
   }
 
-  const llmReady = () => !!(API.caps && API.caps.llm && API.caps.llm.configured);
+  const serverLLM = () => !!(API.caps && API.caps.llm && API.caps.llm.configured);
+  const localLLM = () => typeof window.PomiLLM !== 'undefined' && window.PomiLLM.configured();
   const imageReady = () => !!(API.caps && API.caps.image && API.caps.image.configured);
 
   function updateServerBadge() {
     const badge = $('#server-state');
     if (!badge) return;
-    if (!API.caps) {
-      badge.textContent = 'hors ligne';
-      badge.classList.remove('is-live');
+    if (localLLM()) {
+      const cfg = window.PomiLLM.getConfig();
+      badge.textContent = cfg.provider + ' · ' + (cfg.model || window.PomiLLM.PROVIDERS[cfg.provider].model);
+      badge.classList.add('is-live');
       return;
     }
-    if (llmReady()) {
-      badge.textContent = API.caps.llm.provider + ' · ' + API.caps.llm.model;
+    if (serverLLM()) {
+      badge.textContent = API.caps.llm.provider + ' · serveur';
       badge.classList.add('is-live');
-    } else {
-      badge.textContent = 'mode local';
-      badge.classList.remove('is-live');
+      return;
     }
+    badge.textContent = 'gabarits locaux';
+    badge.classList.remove('is-live');
   }
 
-  const SCREENS = ['s-landing', 's-scan', 's-dna', 's-campaigns', 's-studio'];
+  const SCREENS = ['s-landing', 's-scan', 's-dna', 's-campaigns', 's-studio', 's-settings'];
 
   function show(id) {
     SCREENS.forEach((s) => $('#' + s).classList.toggle('is-active', s === id));
@@ -1027,20 +1029,44 @@
     markStep(0, 'run');
 
     let dna = null;
+    let signals = null;
 
     if (API.base !== null) {
       try {
         const res = await apiPost('/api/analyze', { url: urlObj.href }, 45000);
-        if (res && res.dna) {
-          dna = res.dna;
-          await revealScan(res.signals || {}, dna);
+        if (res) {
+          signals = res.signals || null;
+          dna = res.dna || null;
         }
       } catch (err) {
         console.warn('analyse serveur :', err.message);
       }
     }
 
-    if (!dna) dna = await buildDna(urlObj, markStep);
+    if (signals && localLLM()) {
+      markStep(4, 'run', 'modèle');
+      try {
+        const p = window.PomiLLM.prompts.dna(signals);
+        const out = await window.PomiLLM.completeJSON(p.system, p.user, 1200);
+        if (out && out.palette && out.brand) {
+          dna = {
+            brand: String(out.brand).slice(0, 60),
+            desc: signals.description || 'Profil construit à partir de ' + urlObj.hostname,
+            offer: String(out.offer || '').slice(0, 120),
+            audience: String(out.audience || '').slice(0, 140),
+            tone: (out.tone || []).slice(0, 3).map((t) => String(t).slice(0, 24)),
+            palette: out.palette,
+            fonts: (dna && dna.fonts && dna.fonts.length) ? dna.fonts : [{ name: 'système', count: 0 }],
+            source: 'analyse + modèle'
+          };
+        }
+      } catch (err) {
+        console.warn('DNA par le modèle :', err.message);
+      }
+    }
+
+    if (dna) await revealScan(signals || {}, dna);
+    else dna = await buildDna(urlObj, markStep);
 
     state.dna = dna;
     renderDna();
@@ -1123,12 +1149,37 @@
 
   /* ---------- campagnes ---------- */
 
+  function normalizeCampaign(c, i) {
+    return {
+      angle: String(c.angle || ['Manifeste', 'Produit', 'Preuve'][i]).slice(0, 24),
+      kicker: String(c.kicker || '').slice(0, 18).toUpperCase(),
+      headline: String(c.headline || '').slice(0, 90),
+      sub: String(c.sub || '').slice(0, 140),
+      cta: String(c.cta || 'Découvrir').slice(0, 22),
+      layout: [0, 1, 2].indexOf(c.layout) >= 0 ? c.layout : i % 3
+    };
+  }
+
   async function renderCampaigns() {
     const d = state.dna;
     $('#camp-brand').textContent = d.brand;
 
     let camps = null;
-    if (llmReady()) {
+
+    if (localLLM()) {
+      $('#camp-grid').innerHTML = '<p class="loading-note">Le modèle écrit trois angles…</p>';
+      try {
+        const p = window.PomiLLM.prompts.campaigns(d);
+        const out = await window.PomiLLM.completeJSON(p.system, p.user, 1400);
+        if (out && Array.isArray(out.campaigns) && out.campaigns.length) {
+          camps = out.campaigns.slice(0, 3).map(normalizeCampaign);
+        }
+      } catch (err) {
+        console.warn('campagnes (modèle) :', err.message);
+      }
+    }
+
+    if (!camps && serverLLM()) {
       $('#camp-grid').innerHTML = '<p class="loading-note">Le modèle écrit trois angles…</p>';
       try {
         const res = await apiPost('/api/campaigns', { dna: d }, 60000);
@@ -1374,21 +1425,35 @@
 
   async function applyPrompt(raw) {
     if (!raw || !raw.trim()) return;
+    const c = state.creative;
+    const snapshot = {
+      headline: c.headline,
+      kicker: c.kicker,
+      cta: c.cta,
+      scale: c.scale,
+      layout: c.layout,
+      showCta: c.showCta
+    };
 
-    if (llmReady()) {
+    if (localLLM()) {
       $('#edit-log').textContent = 'le modèle interprète…';
       try {
-        const c = state.creative;
+        const p = window.PomiLLM.prompts.edit(state.dna, snapshot, raw);
+        const res = await window.PomiLLM.completeJSON(p.system, p.user, 600);
+        applyPatch(res.patch);
+        $('#edit-log').textContent = res.note || 'appliqué';
+        return;
+      } catch (err) {
+        console.warn('édition (modèle) :', err.message);
+      }
+    }
+
+    if (serverLLM()) {
+      $('#edit-log').textContent = 'le modèle interprète…';
+      try {
         const res = await apiPost('/api/edit', {
           dna: state.dna,
-          creative: {
-            headline: c.headline,
-            kicker: c.kicker,
-            cta: c.cta,
-            scale: c.scale,
-            layout: c.layout,
-            showCta: c.showCta
-          },
+          creative: snapshot,
           instruction: raw
         }, 40000);
         applyPatch(res.patch);
@@ -1605,6 +1670,81 @@
       }
       note.textContent = formats.length + ' fichiers exportés — 1:1, 4:5, 9:16, 16:9.';
       btn.disabled = false;
+    });
+
+    /* ---------- réglages : clé API ---------- */
+
+    let settingsFrom = 's-landing';
+    let settingsProvider = 'gemini';
+
+    function currentScreen() {
+      return SCREENS.filter((s) => $('#' + s).classList.contains('is-active'))[0] || 's-landing';
+    }
+
+    function paintProvider() {
+      $$('#provider-seg .chip').forEach((c) => c.classList.toggle('is-on', c.dataset.provider === settingsProvider));
+      const meta = window.PomiLLM.PROVIDERS[settingsProvider];
+      $('#key-help').textContent = meta.help;
+      $('#key-input').placeholder = meta.keyHint;
+      $('#model-input').placeholder = meta.model;
+    }
+
+    function openSettings() {
+      settingsFrom = currentScreen();
+      const cfg = window.PomiLLM.getConfig();
+      settingsProvider = cfg ? cfg.provider : 'gemini';
+      $('#key-input').value = cfg ? cfg.key : '';
+      $('#model-input').value = cfg && cfg.model ? cfg.model : '';
+      $('#key-status').textContent = cfg ? 'clé enregistrée dans ce navigateur.' : '';
+      paintProvider();
+      show('s-settings');
+    }
+
+    $('#btn-settings').addEventListener('click', openSettings);
+    $('#btn-settings-back').addEventListener('click', () => show(settingsFrom));
+
+    $$('#provider-seg .chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        settingsProvider = chip.dataset.provider;
+        paintProvider();
+      });
+    });
+
+    $('#btn-key-save').addEventListener('click', () => {
+      const key = $('#key-input').value.trim();
+      if (!key) {
+        $('#key-status').textContent = 'colle une clé d\'abord.';
+        return;
+      }
+      window.PomiLLM.setConfig({
+        provider: settingsProvider,
+        key,
+        model: $('#model-input').value.trim()
+      });
+      $('#key-status').textContent = 'enregistrée — teste-la pour vérifier.';
+      updateServerBadge();
+    });
+
+    $('#btn-key-test').addEventListener('click', async () => {
+      if (!window.PomiLLM.configured()) {
+        $('#key-status').textContent = 'enregistre la clé d\'abord.';
+        return;
+      }
+      $('#key-status').textContent = 'test en cours…';
+      try {
+        const r = await window.PomiLLM.test();
+        $('#key-status').textContent = 'ok — ' + r.provider + ' / ' + r.model;
+      } catch (err) {
+        $('#key-status').textContent = 'échec : ' + err.message;
+      }
+    });
+
+    $('#btn-key-clear').addEventListener('click', () => {
+      window.PomiLLM.clearConfig();
+      $('#key-input').value = '';
+      $('#model-input').value = '';
+      $('#key-status').textContent = 'clé effacée.';
+      updateServerBadge();
     });
 
     if (document.fonts && document.fonts.ready) {
