@@ -56,7 +56,7 @@ const BASE = process.argv[2] || 'http://127.0.0.1:8787';
 
   await page.fill('#edit-input', 'titre plus grand');
   await page.press('#edit-input', 'Enter');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(5000);
   logs.push('note edition: ' + (await page.evaluate(() => document.querySelector('#edit-log').textContent)));
 
   await page.screenshot({ path: 'shots/e2e-studio.png' });

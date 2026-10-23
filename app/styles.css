@@ -217,20 +217,37 @@ body::before {
   gap: 9px;
 }
 
-.rail-gear {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: var(--dim);
-  padding: 5px;
-  display: grid;
-  place-items: center;
-  margin-left: 4px;
-  flex: 0 0 auto;
-  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+  background: oklch(13.5% 0.012 110 / 0.92);
+  backdrop-filter: blur(8px);
 }
 
-.rail-gear:hover { color: var(--accent); border-color: var(--line); }
+.icon-btn {
+  background: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  color: var(--muted);
+  padding: 7px;
+  display: grid;
+  place-items: center;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: oklch(19% 0.016 110);
+}
 
 .rail-link {
   background: none;
