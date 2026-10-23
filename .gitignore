@@ -1,0 +1,14 @@
+node_modules/
+.env
+shots/
+dev/*.log
+.workbuddy-ai/
+
+# artefacts bruts du démontage REA (code et images appartenant à Google) :
+# seules les analyses rédigées sont versionnées
+rea/pomelli/analysis.json
+rea/pomelli/bundle/
+rea/pomelli/assets/
+rea/pomelli/about.html
+rea/pomelli/pomelli.html
+rea/pomelli/*.err

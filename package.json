@@ -1,0 +1,13 @@
+{
+  "name": "pomiad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Du site d'un client à une série de créas à sa charte.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

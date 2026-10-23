@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PomiAD — du site à la campagne</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="rail">
+    <div class="rail-top">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="rail-name">PomiAD</span>
+      <span class="rail-tag">studio</span>
+    </div>
+
+    <div class="rail-label">Marques</div>
+    <ul class="brand-list" id="brand-list"></ul>
+    <button class="rail-new" id="btn-restart">+ Nouvelle marque</button>
+
+    <div class="rail-foot">
+      <span class="state" id="server-state">hors ligne</span>
+    </div>
+  </aside>
+
+  <main id="app">
+
+    <section class="screen is-active" id="s-landing">
+      <div class="intake">
+        <div class="intake-main">
+          <span class="kicker">01 — Nouvelle marque</span>
+          <h1>Ton site contient<br>déjà toute ta marque.</h1>
+          <p class="lede">
+            Colle une URL. On en extrait la palette, les polices, le ton de voix et le style
+            d'image, puis on en fait des campagnes à la charte — exportables en une passe.
+          </p>
+
+          <form class="url-form" id="url-form" autocomplete="off">
+            <input id="url-input" type="text" inputmode="url" placeholder="https://ton-client.com" aria-label="URL du site" spellcheck="false">
+            <button type="submit" class="primary" id="btn-analyze">Analyser</button>
+          </form>
+
+          <div class="samples">
+            <span class="samples-label">Essayer</span>
+            <button class="link" data-url="https://www.patagonia.com">patagonia.com</button>
+            <button class="link" data-url="https://www.aesop.com">aesop.com</button>
+            <button class="link" data-url="https://example.com">example.com</button>
+          </div>
+        </div>
+
+        <aside class="specimen" aria-hidden="true">
+          <div class="specimen-head">Ce qui sera extrait</div>
+          <dl class="specimen-list">
+            <div class="specimen-row">
+              <dt>Palette</dt>
+              <dd><span class="sk sk-swatch"></span><span class="sk sk-swatch"></span><span class="sk sk-swatch"></span><span class="sk sk-swatch"></span></dd>
+            </div>
+            <div class="specimen-row">
+              <dt>Typographie</dt>
+              <dd><span class="sk-type">Aa</span></dd>
+            </div>
+            <div class="specimen-row">
+              <dt>Ton de voix</dt>
+              <dd><span class="sk sk-tag"></span><span class="sk sk-tag"></span><span class="sk sk-tag"></span></dd>
+            </div>
+            <div class="specimen-row">
+              <dt>Promesse</dt>
+              <dd><span class="sk sk-line"></span><span class="sk sk-line short"></span></dd>
+            </div>
+          </dl>
+          <p class="specimen-foot">Analyse locale. Le site est lu par le serveur de la machine, rien ne transite par un tiers.</p>
+        </aside>
+      </div>
+
+      <ol class="flow">
+        <li><span class="num">01</span><span class="flow-t">URL du client</span><span class="flow-d">le site est lu, styles compris</span></li>
+        <li><span class="num">02</span><span class="flow-t">Profil de marque</span><span class="flow-d">palette, typographie, ton</span></li>
+        <li><span class="num">03</span><span class="flow-t">Série de créas</span><span class="flow-d">quatre formats, un export</span></li>
+      </ol>
+    </section>
+
+    <section class="screen" id="s-scan">
+      <span class="kicker">02 — Lecture</span>
+      <h2 class="scan-title"><span id="scan-host" class="mono"></span></h2>
+      <ol class="scan-steps" id="scan-steps"></ol>
+      <p class="scan-foot">Un site qui bloque les robots ne renverra rien : dans ce cas le profil est composé, et c'est écrit.</p>
+    </section>
+
+    <section class="screen" id="s-dna">
+      <header class="sheet-head">
+        <div>
+          <span class="kicker">03 — Profil de marque</span>
+          <h2 id="dna-title">—</h2>
+          <p class="lede small" id="dna-desc">—</p>
+        </div>
+        <div class="sheet-actions">
+          <span class="pill-muted" id="mode-badge" hidden></span>
+          <button class="ghost" id="btn-redo">Relancer</button>
+          <button class="primary" id="btn-campaigns">Générer les campagnes</button>
+        </div>
+      </header>
+
+      <div class="sheet">
+        <section class="cell cell-wide">
+          <h3><span class="num">01</span> Palette</h3>
+          <p class="cell-sub">Clique une pastille pour la corriger.</p>
+          <div class="swatches" id="swatches"></div>
+        </section>
+
+        <section class="cell">
+          <h3><span class="num">02</span> Typographie</h3>
+          <p class="cell-sub" id="font-sub">Détectée dans les styles du site.</p>
+          <div class="type-sample" id="type-sample">Aa</div>
+          <div class="type-meta">
+            <span class="mono" id="font-name">—</span>
+            <span class="mono muted" id="font-count"></span>
+          </div>
+        </section>
+
+        <section class="cell">
+          <h3><span class="num">03</span> Ton de voix</h3>
+          <p class="cell-sub">Retire ce qui sonne faux.</p>
+          <div class="tags" id="tone-tags"></div>
+          <div class="add-tag">
+            <input id="tone-input" type="text" placeholder="ajouter un adjectif" aria-label="Ajouter un adjectif de ton">
+            <button class="mini" id="tone-add" type="button" aria-label="Ajouter">+</button>
+          </div>
+        </section>
+
+        <section class="cell cell-wide">
+          <h3><span class="num">04</span> Terrain de jeu</h3>
+          <p class="cell-sub">Ce que la marque vend, en une ligne.</p>
+          <div class="terrain">
+            <div>
+              <input id="dna-offer" class="text-input" type="text" placeholder="ex. des vestes techniques réparées à vie">
+            </div>
+            <div>
+              <div class="meta-row">
+                <span class="meta-label">Audience</span>
+                <span id="dna-audience">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Source</span>
+                <span id="dna-source">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="screen" id="s-campaigns">
+      <header class="sheet-head">
+        <div>
+          <span class="kicker">04 — Campagnes</span>
+          <h2>Trois angles pour <span id="camp-brand">ta marque</span></h2>
+        </div>
+        <button class="ghost" id="btn-back-dna">Modifier le profil</button>
+      </header>
+
+      <div class="camp-grid" id="camp-grid"></div>
+
+      <form class="prompt-row" id="custom-form">
+        <input id="custom-input" type="text" placeholder="Ou décris ton idée : « annonce la nouvelle collection aux abonnés »" aria-label="Décrire une campagne">
+        <button class="primary" type="submit">Créer</button>
+      </form>
+    </section>
+
+    <section class="screen" id="s-studio">
+      <div class="studio">
+        <div class="stage">
+          <div class="stage-bar">
+            <div class="formats" id="formats">
+              <button class="chip is-on" data-format="1:1">1:1</button>
+              <button class="chip" data-format="4:5">4:5</button>
+              <button class="chip" data-format="9:16">9:16</button>
+              <button class="chip" data-format="16:9">16:9</button>
+            </div>
+            <div class="stage-actions">
+              <button class="ghost" id="btn-bg">Fond IA</button>
+              <button class="ghost" id="btn-variant">Variante</button>
+              <button class="primary" id="btn-series">Exporter la série</button>
+              <button class="ghost" id="btn-download">PNG</button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="canvas" width="1080" height="1080"></canvas>
+          </div>
+          <p class="canvas-note" id="canvas-note"></p>
+        </div>
+
+        <aside class="inspector">
+          <button class="back" id="btn-back-camp">← Campagnes</button>
+          <h3 id="insp-title">Créa</h3>
+
+          <label class="field">
+            <span>Titre</span>
+            <textarea id="f-headline" rows="2"></textarea>
+          </label>
+          <label class="field">
+            <span>Sur-titre</span>
+            <input id="f-kicker" type="text">
+          </label>
+          <label class="field">
+            <span>Bouton</span>
+            <input id="f-cta" type="text">
+          </label>
+
+          <div class="field">
+            <span>Palette</span>
+            <div class="swatches small" id="swatches-mini"></div>
+          </div>
+
+          <div class="field">
+            <span>Édition au prompt</span>
+            <div class="prompt-inline">
+              <input id="edit-input" type="text" placeholder="« fond plus clair », « titre plus grand »">
+              <button class="mini" id="edit-send" type="button" aria-label="Appliquer">↵</button>
+            </div>
+            <p class="log" id="edit-log"></p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
