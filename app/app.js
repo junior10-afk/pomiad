@@ -805,8 +805,8 @@
     const badge = $('#server-state');
     if (!badge) return;
     if (localLLM()) {
-      const cfg = window.PomiLLM.getConfig();
-      badge.textContent = cfg.provider + ' · ' + (cfg.model || window.PomiLLM.PROVIDERS[cfg.provider].model);
+      const r = window.PomiLLM.resolve('text');
+      badge.textContent = r ? (r.provider + ' · ' + r.model) : 'clé sans modèle texte';
       badge.classList.add('is-live');
       return;
     }
@@ -1567,33 +1567,54 @@
 
     $('#btn-bg').addEventListener('click', generateBackground);
 
+    function applyBackground(dataUrl, model) {
+      const note = $('#canvas-note');
+      const btn = $('#btn-bg');
+      const img = new Image();
+      img.onload = () => {
+        bgImage = img;
+        redraw();
+        note.textContent = 'Fond généré par ' + model + '.';
+        btn.disabled = false;
+      };
+      img.onerror = () => {
+        note.textContent = 'Image reçue mais illisible.';
+        btn.disabled = false;
+      };
+      img.src = dataUrl;
+    }
+
     async function generateBackground() {
       const note = $('#canvas-note');
       const btn = $('#btn-bg');
-      if (!imageReady()) {
-        note.textContent = 'Aucune clé image — ajoute IMAGE_PROVIDER et une clé dans .env, puis relance le serveur.';
+
+      if (!window.PomiLLM.imageReady() && !imageReady()) {
+        note.textContent = 'Aucun modèle d\'image — ajoute une clé Gemini dans Réglages, ou IMAGE_PROVIDER dans .env.';
         return;
       }
+
       btn.disabled = true;
       note.textContent = 'Génération du fond…';
+
+      if (window.PomiLLM.imageReady()) {
+        try {
+          const res = await window.PomiLLM.generateImage(window.PomiLLM.imagePrompt(state.dna), state.creative.format);
+          applyBackground(res.dataUrl, res.model);
+          return;
+        } catch (err) {
+          note.textContent = 'Échec image : ' + err.message;
+          btn.disabled = false;
+          return;
+        }
+      }
+
       try {
         const res = await apiPost('/api/image', {
           dna: state.dna,
           creative: { headline: state.creative.headline },
           aspect: state.creative.format
         }, 130000);
-        const img = new Image();
-        img.onload = () => {
-          bgImage = img;
-          redraw();
-          note.textContent = 'Fond généré par ' + res.model + '.';
-          btn.disabled = false;
-        };
-        img.onerror = () => {
-          note.textContent = 'Image reçue mais illisible.';
-          btn.disabled = false;
-        };
-        img.src = res.dataUrl;
+        applyBackground(res.dataUrl, res.model);
       } catch (err) {
         note.textContent = 'Échec image : ' + err.message;
         btn.disabled = false;
@@ -1672,62 +1693,175 @@
       btn.disabled = false;
     });
 
-    /* ---------- réglages : clé API ---------- */
+    /* ---------- réglages : clés et modèles ---------- */
 
     let settingsFrom = 's-landing';
-    let settingsProvider = 'gemini';
 
     function currentScreen() {
       return SCREENS.filter((s) => $('#' + s).classList.contains('is-active'))[0] || 's-landing';
     }
 
-    function paintProvider() {
-      $$('#provider-seg .chip').forEach((c) => c.classList.toggle('is-on', c.dataset.provider === settingsProvider));
-      const meta = window.PomiLLM.PROVIDERS[settingsProvider];
-      $('#key-help').textContent = meta.help;
-      $('#key-input').placeholder = meta.keyHint;
-      $('#model-input').placeholder = meta.model;
+    function renderKeys() {
+      const cfg = window.PomiLLM.getConfig();
+      const wrap = $('#key-rows');
+      wrap.innerHTML = '';
+      Object.keys(window.PomiLLM.PROVIDERS).forEach((id) => {
+        const meta = window.PomiLLM.PROVIDERS[id];
+        const row = document.createElement('label');
+        row.className = 'key-row';
+
+        const name = document.createElement('span');
+        name.className = 'key-name';
+        name.textContent = meta.label;
+
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.placeholder = meta.keyHint;
+        input.value = cfg.keys[id] || '';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        input.dataset.provider = id;
+
+        const dot = document.createElement('span');
+        dot.className = 'key-dot' + (cfg.keys[id] ? ' is-on' : '');
+
+        input.addEventListener('input', () => {
+          dot.classList.toggle('is-on', input.value.trim().length > 0);
+        });
+
+        row.appendChild(name);
+        row.appendChild(input);
+        row.appendChild(dot);
+        wrap.appendChild(row);
+      });
+    }
+
+    async function fillModels(select, provider, cap, selected) {
+      select.innerHTML = '';
+      const auto = document.createElement('option');
+      auto.value = 'auto';
+      auto.textContent = 'Auto';
+      select.appendChild(auto);
+
+      let target = provider;
+      if (target === 'auto') {
+        const r = window.PomiLLM.resolve(cap);
+        target = r ? r.provider : null;
+      }
+      if (!target) {
+        select.disabled = true;
+        select.options[0].textContent = '— aucune clé —';
+        return;
+      }
+      select.disabled = false;
+      const models = await window.PomiLLM.listModels(target, cap);
+      if (!models.length) select.options[0].textContent = 'Auto (défaut)';
+      models.forEach((id) => {
+        const o = document.createElement('option');
+        o.value = id;
+        o.textContent = id;
+        select.appendChild(o);
+      });
+      select.value = (selected && selected !== 'auto' && models.indexOf(selected) >= 0) ? selected : 'auto';
+    }
+
+    function renderModels() {
+      const cfg = window.PomiLLM.getConfig();
+      const wrap = $('#model-rows');
+      wrap.innerHTML = '';
+
+      window.PomiLLM.CAPS.forEach((cap) => {
+        const pick = cfg.picks[cap.id] || { provider: 'auto', model: 'auto' };
+        const row = document.createElement('div');
+        row.className = 'model-row' + (cap.wired === false ? ' is-off' : '');
+
+        const label = document.createElement('div');
+        const n = document.createElement('span');
+        n.className = 'cap-name';
+        n.textContent = cap.label;
+        const h = document.createElement('span');
+        h.className = 'cap-hint';
+        h.textContent = cap.hint;
+        label.appendChild(n);
+        label.appendChild(h);
+
+        const psel = document.createElement('select');
+        psel.disabled = cap.wired === false;
+        const autoOpt = document.createElement('option');
+        autoOpt.value = 'auto';
+        autoOpt.textContent = 'Auto';
+        psel.appendChild(autoOpt);
+        Object.keys(window.PomiLLM.PROVIDERS).forEach((id) => {
+          if (!window.PomiLLM.supports(id, cap.id)) return;
+          const hasKey = window.PomiLLM.keyedProviders().indexOf(id) >= 0;
+          const o = document.createElement('option');
+          o.value = id;
+          o.textContent = window.PomiLLM.PROVIDERS[id].label + (hasKey ? '' : ' — sans clé');
+          o.disabled = !hasKey;
+          psel.appendChild(o);
+        });
+        psel.value = pick.provider;
+
+        const msel = document.createElement('select');
+        msel.disabled = cap.wired === false;
+
+        psel.addEventListener('change', async () => {
+          const cfg2 = window.PomiLLM.getConfig();
+          cfg2.picks[cap.id] = { provider: psel.value, model: 'auto' };
+          window.PomiLLM.setConfig(cfg2);
+          await fillModels(msel, psel.value, cap.id, 'auto');
+          updateServerBadge();
+        });
+
+        msel.addEventListener('change', () => {
+          const cfg2 = window.PomiLLM.getConfig();
+          cfg2.picks[cap.id] = { provider: psel.value, model: msel.value };
+          window.PomiLLM.setConfig(cfg2);
+          updateServerBadge();
+        });
+
+        row.appendChild(label);
+        row.appendChild(psel);
+        row.appendChild(msel);
+        wrap.appendChild(row);
+
+        fillModels(msel, pick.provider, cap.id, pick.model);
+      });
     }
 
     function openSettings() {
       settingsFrom = currentScreen();
       const cfg = window.PomiLLM.getConfig();
-      settingsProvider = cfg ? cfg.provider : 'gemini';
-      $('#key-input').value = cfg ? cfg.key : '';
-      $('#model-input').value = cfg && cfg.model ? cfg.model : '';
-      $('#key-status').textContent = cfg ? 'clé enregistrée dans ce navigateur.' : '';
-      paintProvider();
+      $('#key-status').textContent = window.PomiLLM.configured()
+        ? 'clés enregistrées dans ce navigateur.'
+        : '';
+      renderKeys();
+      renderModels();
       show('s-settings');
     }
 
     $('#btn-settings').addEventListener('click', openSettings);
     $('#btn-settings-back').addEventListener('click', () => show(settingsFrom));
 
-    $$('#provider-seg .chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        settingsProvider = chip.dataset.provider;
-        paintProvider();
-      });
-    });
-
     $('#btn-key-save').addEventListener('click', () => {
-      const key = $('#key-input').value.trim();
-      if (!key) {
-        $('#key-status').textContent = 'colle une clé d\'abord.';
-        return;
-      }
-      window.PomiLLM.setConfig({
-        provider: settingsProvider,
-        key,
-        model: $('#model-input').value.trim()
+      const cfg = window.PomiLLM.getConfig();
+      let count = 0;
+      $$('#key-rows input').forEach((input) => {
+        const v = input.value.trim();
+        cfg.keys[input.dataset.provider] = v;
+        if (v) count++;
       });
-      $('#key-status').textContent = 'enregistrée — teste-la pour vérifier.';
+      window.PomiLLM.setConfig(cfg);
+      $('#key-status').textContent = count
+        ? count + ' clé(s) enregistrée(s) — teste pour vérifier.'
+        : 'aucune clé saisie.';
+      renderModels();
       updateServerBadge();
     });
 
     $('#btn-key-test').addEventListener('click', async () => {
       if (!window.PomiLLM.configured()) {
-        $('#key-status').textContent = 'enregistre la clé d\'abord.';
+        $('#key-status').textContent = 'enregistre une clé d\'abord.';
         return;
       }
       $('#key-status').textContent = 'test en cours…';
@@ -1741,9 +1875,9 @@
 
     $('#btn-key-clear').addEventListener('click', () => {
       window.PomiLLM.clearConfig();
-      $('#key-input').value = '';
-      $('#model-input').value = '';
-      $('#key-status').textContent = 'clé effacée.';
+      $('#key-status').textContent = 'clés effacées.';
+      renderKeys();
+      renderModels();
       updateServerBadge();
     });
 

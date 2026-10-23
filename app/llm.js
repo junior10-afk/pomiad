@@ -1,46 +1,95 @@
 /* PomiAD — client LLM « bring your own key ».
-   La clé est saisie dans les réglages, stockée dans localStorage, et n'est
-   jamais transmise à notre serveur : les appels partent du navigateur vers
-   le fournisseur choisi. */
+   Les clés sont saisies dans les réglages, stockées dans localStorage, et ne
+   sont jamais transmises à notre serveur : les appels partent du navigateur.
+   Chaque capacité (texte, image) a son fournisseur et son modèle, réglables
+   sur « auto » ou choisis dans la liste du fournisseur. */
 
 (function (global) {
   'use strict';
 
-  const STORE = 'pomiad.llm.v1';
+  const STORE = 'pomiad.llm.v2';
 
   const PROVIDERS = {
     gemini: {
       label: 'Gemini',
-      model: 'gemini-2.5-flash',
       keyHint: 'AIza…',
       help: 'Clé gratuite sur aistudio.google.com/apikey',
-      url: 'https://aistudio.google.com/apikey'
+      url: 'https://aistudio.google.com/apikey',
+      text: 'gemini-2.5-flash',
+      image: 'gemini-2.5-flash-image'
     },
     openai: {
       label: 'OpenAI',
-      model: 'gpt-4o-mini',
       keyHint: 'sk-…',
-      help: 'Clé sur platform.openai.com/api-keys — OpenAI bloque souvent l\'appel depuis un navigateur : si ça échoue, préfère Gemini ou passe par .env',
-      url: 'https://platform.openai.com/api-keys'
+      help: 'Clé sur platform.openai.com/api-keys — souvent bloqué par le navigateur (CORS)',
+      url: 'https://platform.openai.com/api-keys',
+      text: 'gpt-4o-mini',
+      image: 'gpt-image-1'
     },
     anthropic: {
       label: 'Anthropic',
-      model: 'claude-sonnet-4-5',
       keyHint: 'sk-ant-…',
       help: 'Clé sur console.anthropic.com',
-      url: 'https://console.anthropic.com/settings/keys'
+      url: 'https://console.anthropic.com/settings/keys',
+      text: 'claude-sonnet-4-5',
+      image: null
     }
   };
 
+  const CAPS = [
+    { id: 'text', label: 'Texte', hint: 'profil, campagnes, édition' },
+    { id: 'image', label: 'Image', hint: 'fonds de créa' },
+    { id: 'video', label: 'Vidéo', hint: 'non branché', wired: false }
+  ];
+
+  /* Repli quand le fournisseur n'expose pas de catalogue lisible depuis le
+     navigateur (OpenAI, Anthropic). */
+  const FALLBACK_MODELS = {
+    openai: { text: ['gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'], image: ['gpt-image-1'] },
+    anthropic: { text: ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4-1'], image: [] }
+  };
+
+  /* ---------- config ---------- */
+
+  function emptyConfig() {
+    return {
+      keys: { gemini: '', openai: '', anthropic: '' },
+      picks: {
+        text: { provider: 'auto', model: 'auto' },
+        image: { provider: 'auto', model: 'auto' },
+        video: { provider: 'auto', model: 'auto' }
+      }
+    };
+  }
+
   function getConfig() {
+    let cfg = null;
     try {
       const raw = localStorage.getItem(STORE);
-      const c = raw ? JSON.parse(raw) : null;
-      if (!c || !PROVIDERS[c.provider] || !c.key) return null;
-      return c;
+      if (raw) {
+        cfg = JSON.parse(raw);
+      } else {
+        const legacy = localStorage.getItem('pomiad.llm.v1');
+        if (legacy) {
+          const old = JSON.parse(legacy);
+          cfg = emptyConfig();
+          if (old && old.provider && old.key) {
+            cfg.keys[old.provider] = old.key;
+            cfg.picks.text = { provider: old.provider, model: old.model || 'auto' };
+          }
+          localStorage.removeItem('pomiad.llm.v1');
+          setConfig(cfg);
+        }
+      }
     } catch (e) {
-      return null;
+      cfg = null;
     }
+    const base = emptyConfig();
+    if (!cfg || typeof cfg !== 'object') return base;
+    return {
+      keys: Object.assign(base.keys, cfg.keys || {}),
+      picks: Object.assign(base.picks, cfg.picks || {})
+    };
   }
 
   function setConfig(cfg) {
@@ -49,17 +98,85 @@
 
   function clearConfig() {
     localStorage.removeItem(STORE);
+    localStorage.removeItem('pomiad.llm.v1');
+  }
+
+  function keyOf(provider, cfg) {
+    const c = cfg || getConfig();
+    return String(c.keys[provider] || '').trim();
+  }
+
+  function keyedProviders(cfg) {
+    const c = cfg || getConfig();
+    return Object.keys(PROVIDERS).filter((p) => keyOf(p, c));
+  }
+
+  function supports(provider, cap) {
+    if (cap === 'video') return false;
+    if (cap === 'image') return !!PROVIDERS[provider].image;
+    return !!PROVIDERS[provider].text;
+  }
+
+  /* ---------- résolution du modèle ---------- */
+
+  function resolve(cap, cfg) {
+    const c = cfg || getConfig();
+    const pick = (c.picks && c.picks[cap]) || { provider: 'auto', model: 'auto' };
+    const available = keyedProviders(c).filter((p) => supports(p, cap));
+    if (!available.length) return null;
+
+    const provider = pick.provider !== 'auto' && available.indexOf(pick.provider) >= 0
+      ? pick.provider
+      : available[0];
+
+    const fallbackModel = PROVIDERS[provider][cap];
+    const model = pick.model && pick.model !== 'auto' ? pick.model : fallbackModel;
+    return { provider, model };
   }
 
   function configured() {
-    return getConfig() !== null;
+    return keyedProviders().length > 0;
   }
 
-  function modelOf(cfg) {
-    const c = cfg || getConfig();
-    if (!c) return null;
-    return c.model || PROVIDERS[c.provider].model;
+  function textReady() {
+    return resolve('text') !== null;
   }
+
+  function imageReady() {
+    return resolve('image') !== null;
+  }
+
+  /* ---------- catalogue de modèles ---------- */
+
+  async function listModels(provider, cap) {
+    if (provider === 'gemini') {
+      const key = keyOf('gemini');
+      if (!key) return [];
+      try {
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' +
+          encodeURIComponent(key) + '&pageSize=200', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        return (json.models || [])
+          .filter((m) => (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0)
+          .map((m) => String(m.name || '').replace(/^models\//, ''))
+          .filter((id) => {
+            if (!id) return false;
+            if (/embedding|aqa|tts|learnlm|veo|imagen/i.test(id)) return false;
+            const isImage = /image/i.test(id);
+            return cap === 'image' ? isImage : !isImage;
+          })
+          .sort()
+          .slice(0, 60);
+      } catch (e) {
+        return [];
+      }
+    }
+    const fb = FALLBACK_MODELS[provider] || {};
+    return (fb[cap] || []).slice();
+  }
+
+  /* ---------- appels ---------- */
 
   function extractJson(text) {
     if (!text) throw new Error('réponse vide');
@@ -91,7 +208,7 @@
     } catch (e) {
       if (e.name === 'AbortError') throw new Error('délai dépassé');
       if (e instanceof TypeError) {
-        throw new Error('appel bloqué par le navigateur (CORS) — utilise Gemini, ou mets la clé dans .env côté serveur');
+        throw new Error('appel bloqué par le navigateur (CORS) — essaie Gemini, ou mets la clé dans .env côté serveur');
       }
       throw e;
     } finally {
@@ -100,14 +217,15 @@
   }
 
   async function completeJSON(system, user, maxTokens) {
-    const cfg = getConfig();
-    if (!cfg) throw new Error('aucune clé configurée');
-    const model = modelOf(cfg);
+    const target = resolve('text');
+    if (!target) throw new Error('aucun modèle de texte configuré');
+    const key = keyOf(target.provider);
+    const model = target.model;
     const max = maxTokens || 2048;
 
-    if (cfg.provider === 'gemini') {
+    if (target.provider === 'gemini') {
       const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-        encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(cfg.key);
+        encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
       const json = await post(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -126,13 +244,10 @@
       return extractJson(parts.map((p) => p.text || '').join(''));
     }
 
-    if (cfg.provider === 'openai') {
+    if (target.provider === 'openai') {
       const json = await post('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: 'Bearer ' + cfg.key
-        },
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
         body: JSON.stringify({
           model,
           temperature: 0.85,
@@ -153,7 +268,7 @@
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': cfg.key,
+        'x-api-key': key,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
@@ -167,6 +282,53 @@
     });
     const text = (json.content || []).map((c) => c.text || '').join('');
     return extractJson(text);
+  }
+
+  const ASPECT_WORDS = {
+    '1:1': 'format carré 1:1',
+    '4:5': 'format portrait 4:5',
+    '9:16': 'format vertical 9:16',
+    '16:9': 'format paysage 16:9'
+  };
+
+  async function generateImage(prompt, aspect) {
+    const target = resolve('image');
+    if (!target) throw new Error('aucun modèle d\'image configuré');
+    const key = keyOf(target.provider);
+    const model = target.model;
+    const framed = prompt + ' — ' + (ASPECT_WORDS[aspect] || 'format carré 1:1') + '.';
+
+    if (target.provider === 'gemini') {
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+        encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
+      const json = await post(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: framed }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+        })
+      }, 120000);
+      const parts = (json.candidates && json.candidates[0] && json.candidates[0].content &&
+        json.candidates[0].content.parts) || [];
+      const inline = parts.filter((p) => p.inlineData || p.inline_data)[0];
+      if (!inline) throw new Error('le modèle n\'a renvoyé aucune image');
+      const data = inline.inlineData || inline.inline_data;
+      const mime = data.mimeType || data.mime_type || 'image/png';
+      return { dataUrl: 'data:' + mime + ';base64,' + data.data, model };
+    }
+
+    const sizeByAspect = { '1:1': '1024x1024', '4:5': '1024x1280', '9:16': '1024x1536', '16:9': '1536x1024' };
+    const json = await post('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
+      body: JSON.stringify({ model, prompt: framed, n: 1, size: sizeByAspect[aspect] || '1024x1024' })
+    }, 120000);
+    const item = (json.data && json.data[0]) || null;
+    if (!item) throw new Error('réponse image vide');
+    if (item.b64_json) return { dataUrl: 'data:image/png;base64,' + item.b64_json, model };
+    if (item.url) return { dataUrl: item.url, model };
+    throw new Error('réponse image inattendue');
   }
 
   /* ---------- prompts ---------- */
@@ -254,28 +416,44 @@
     return { system: SYSTEM_EDIT, user };
   }
 
-  /* ---------- test de la clé ---------- */
+  function imagePrompt(dna) {
+    return 'Photographie publicitaire de marque, sans aucun texte ni logo ni typographie. ' +
+      'Sujet : ' + dna.offer + '. ' +
+      'Ambiance et ton : ' + (dna.tone || []).join(', ') + '. ' +
+      'Palette imposée : dominante ' + dna.palette.primary + ', accents ' + dna.palette.secondary +
+      ' et ' + dna.palette.accent + ', fond ' + dna.palette.bg + '. ' +
+      'Style : éditorial, lumière naturelle latérale, matière réelle, profondeur de champ courte, grain fin. ' +
+      'Composition : sujet décentré, large zone calme et peu contrastée pour recevoir du texte. ' +
+      'Interdit : texte, lettres, watermark, logo, visage identifiable, collage, illustration vectorielle.';
+  }
+
+  /* ---------- test ---------- */
 
   async function test() {
-    const cfg = getConfig();
-    if (!cfg) throw new Error('aucune clé enregistrée');
-    const out = await completeJSON(
-      'Tu réponds uniquement en JSON.',
-      'Réponds exactement {"ok":true}.',
-      64
-    );
-    return { provider: cfg.provider, model: modelOf(cfg), ok: !!(out && out.ok !== false) };
+    const target = resolve('text');
+    if (!target) throw new Error('aucun modèle de texte configuré');
+    const out = await completeJSON('Tu réponds uniquement en JSON.', 'Réponds exactement {"ok":true}.', 64);
+    return { provider: target.provider, model: target.model, ok: !!(out && out.ok !== false) };
   }
 
   global.PomiLLM = {
     PROVIDERS,
+    CAPS,
     getConfig,
     setConfig,
     clearConfig,
+    keyOf,
+    keyedProviders,
+    supports,
+    resolve,
     configured,
-    modelOf,
+    textReady,
+    imageReady,
+    listModels,
     completeJSON,
+    generateImage,
     test,
+    imagePrompt,
     prompts: { dna: dnaPrompt, campaigns: campaignsPrompt, edit: editPrompt }
   };
 })(window);
