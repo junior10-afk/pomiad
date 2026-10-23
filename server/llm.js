@@ -91,11 +91,11 @@ async function completeJSON(system, user, maxTokens) {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: user }] }],
-        generationConfig: {
+        generationConfig: Object.assign({
           temperature: 0.85,
           maxOutputTokens: maxTokens || 2048,
           responseMimeType: 'application/json'
-        }
+        }, /flash/i.test(st.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {})
       })
     }, 60000);
     const parts = (json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts) || [];

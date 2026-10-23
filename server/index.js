@@ -139,6 +139,15 @@ async function handleAnalyze(body) {
   };
 }
 
+/* Coupe sur une limite de mot : jamais « Utiliser Example Domai ». */
+function clip(value, max) {
+  const s = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return (space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.\-]+$/, '');
+}
+
 async function handleCampaigns(body) {
   const dna = body.dna;
   if (!dna || !dna.brand) throw Object.assign(new Error('DNA manquant'), { status: 400 });
@@ -147,11 +156,11 @@ async function handleCampaigns(body) {
   const out = await llm.completeJSON(p.system, p.user, 1400);
   if (!out || !Array.isArray(out.campaigns)) throw new Error('Réponse du modèle inexploitable');
   const campaigns = out.campaigns.slice(0, 3).map((c, i) => ({
-    angle: String(c.angle || ['Manifeste', 'Produit', 'Preuve'][i]).slice(0, 24),
-    kicker: String(c.kicker || '').slice(0, 18).toUpperCase(),
-    headline: String(c.headline || '').slice(0, 90),
-    sub: String(c.sub || '').slice(0, 140),
-    cta: String(c.cta || 'Découvrir').slice(0, 22),
+    angle: clip(c.angle || ['Manifeste', 'Produit', 'Preuve'][i], 24),
+    kicker: clip(c.kicker || '', 24).toUpperCase(),
+    headline: clip(c.headline || '', 90),
+    sub: clip(c.sub || '', 140),
+    cta: clip(c.cta || 'Découvrir', 32),
     layout: [0, 1, 2].includes(c.layout) ? c.layout : i % 3
   }));
   return { campaigns };
@@ -215,7 +224,8 @@ const server = http.createServer(async (req, res) => {
       result.ms = Date.now() - started;
       return sendJSON(res, 200, result);
     } catch (err) {
-      const status = err.status || 500;
+      let status = err.status;
+      if (!status) status = /^\[\d{3}\]/.test(err.message) ? 502 : 500;
       if (status >= 500) console.warn('[api] ' + url.pathname + ' :', err.message);
       return sendJSON(res, status, { error: err.message });
     }

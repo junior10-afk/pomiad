@@ -49,7 +49,7 @@ Palette : fond ${dna.palette.bg}, encre ${dna.palette.ink}, primaire ${dna.palet
 Écris trois angles de campagne distincts :
 1. "Manifeste" — une prise de position, pas un argumentaire produit.
 2. "Produit" — le bénéfice concret, au plus près de l'usage.
-3. "Preuve" — la confiance, l'usage dans le temps, sans inventer de chiffre.
+3. "Preuve" — la confiance, l'usage dans le temps. Aucun chiffre, aucune statistique, même approximative, aucune mention de « millions », de pourcentage ni de durée mesurée.
 
 Réponds avec ce JSON exactement :
 {
@@ -61,7 +61,7 @@ Réponds avec ce JSON exactement :
 }
 
 Contraintes strictes :
-- headline ≤ 52 caractères, sub ≤ 90, cta ≤ 22, kicker ≤ 18 ;
+- headline ≤ 52 caractères, sub ≤ 90, cta ≤ 24, kicker ≤ 18 ;
 - les trois headlines ne commencent pas par le même mot ;
 - aucun emoji, aucun #hashtag, aucun point d'exclamation ;
 - layout vaut 0, 1 ou 2 et doit différer entre les trois angles.`;

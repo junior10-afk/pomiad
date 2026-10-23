@@ -1094,13 +1094,21 @@
 
   /* ---------- campagnes ---------- */
 
+  function clipText(value, max) {
+    const s = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (s.length <= max) return s;
+    const cut = s.slice(0, max);
+    const space = cut.lastIndexOf(' ');
+    return (space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.\-]+$/, '');
+  }
+
   function normalizeCampaign(c, i) {
     return {
-      angle: String(c.angle || ['Manifeste', 'Produit', 'Preuve'][i]).slice(0, 24),
-      kicker: String(c.kicker || '').slice(0, 18).toUpperCase(),
-      headline: String(c.headline || '').slice(0, 90),
-      sub: String(c.sub || '').slice(0, 140),
-      cta: String(c.cta || 'Découvrir').slice(0, 22),
+      angle: clipText(c.angle || ['Manifeste', 'Produit', 'Preuve'][i], 24),
+      kicker: clipText(c.kicker || '', 24).toUpperCase(),
+      headline: clipText(c.headline || '', 90),
+      sub: clipText(c.sub || '', 140),
+      cta: clipText(c.cta || 'Découvrir', 32),
       layout: [0, 1, 2].indexOf(c.layout) >= 0 ? c.layout : i % 3
     };
   }
@@ -1500,6 +1508,13 @@
 
     $('#btn-bg').addEventListener('click', generateBackground);
 
+    function imageError(message) {
+      if (/quota|429|rate limit|exceeded/i.test(message)) {
+        return 'Quota image épuisé sur ce palier — la génération d\'image n\'est pas incluse dans l\'offre gratuite Gemini. Les créas vectoriels restent disponibles.';
+      }
+      return 'Échec image : ' + message;
+    }
+
     function applyBackground(dataUrl, model) {
       const note = $('#canvas-note');
       const btn = $('#btn-bg');
@@ -1535,7 +1550,7 @@
           applyBackground(res.dataUrl, res.model);
           return;
         } catch (err) {
-          note.textContent = 'Échec image : ' + err.message;
+          note.textContent = imageError(err.message);
           btn.disabled = false;
           return;
         }
@@ -1549,7 +1564,7 @@
         }, 130000);
         applyBackground(res.dataUrl, res.model);
       } catch (err) {
-        note.textContent = 'Échec image : ' + err.message;
+        note.textContent = imageError(err.message);
         btn.disabled = false;
       }
     }

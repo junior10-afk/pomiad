@@ -33,7 +33,9 @@ const BASE = process.argv[2] || 'http://127.0.0.1:8787';
   await page.screenshot({ path: 'shots/e2e-dna.png' });
 
   await page.click('#btn-campaigns');
-  await page.waitForTimeout(1200);
+  try {
+    await page.waitForSelector('.camp-card, .gate', { timeout: 40000 });
+  } catch (e) { /* on lit l'état réel plus bas */ }
   const cards = await page.evaluate(() => document.querySelectorAll('.camp-card').length);
   logs.push('campagnes: ' + cards);
   await page.screenshot({ path: 'shots/e2e-camp.png' });

@@ -232,11 +232,11 @@
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: 'user', parts: [{ text: user }] }],
-          generationConfig: {
+          generationConfig: Object.assign({
             temperature: 0.85,
             maxOutputTokens: max,
             responseMimeType: 'application/json'
-          }
+          }, /flash/i.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {})
         })
       });
       const parts = (json.candidates && json.candidates[0] && json.candidates[0].content &&
@@ -382,7 +382,7 @@
       '  { "angle": "Produit",  "kicker": "...", "headline": "...", "sub": "...", "cta": "...", "layout": 1 },\n' +
       '  { "angle": "Preuve",   "kicker": "...", "headline": "...", "sub": "...", "cta": "...", "layout": 2 }\n' +
       '] }\n\n' +
-      'Contraintes strictes : headline ≤ 52 caractères, sub ≤ 90, cta ≤ 22, kicker ≤ 18 ; ' +
+      'Contraintes strictes : headline ≤ 52 caractères, sub ≤ 90, cta ≤ 24, kicker ≤ 18 ; ' +
       'les trois headlines ne commencent pas par le même mot ; aucun emoji, aucun #hashtag, aucun point ' +
       'd\'exclamation ; layout vaut 0, 1 ou 2 et doit différer entre les trois angles.';
     return { system: SYSTEM_CAMPAIGN, user };
