@@ -1841,6 +1841,7 @@
     }
 
     $('#btn-settings').addEventListener('click', openSettings);
+    $('#btn-settings-top').addEventListener('click', openSettings);
     $('#btn-settings-back').addEventListener('click', () => show(settingsFrom));
 
     $('#btn-key-save').addEventListener('click', () => {
