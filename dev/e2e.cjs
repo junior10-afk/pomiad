@@ -38,6 +38,13 @@ const BASE = process.argv[2] || 'http://127.0.0.1:8787';
   logs.push('campagnes: ' + cards);
   await page.screenshot({ path: 'shots/e2e-camp.png' });
 
+  if (!cards) {
+    logs.push('porte affichée (aucun modèle) — studio ignoré');
+    console.log(logs.join('\n'));
+    await browser.close();
+    return;
+  }
+
   await page.click('.camp-card');
   await page.waitForTimeout(800);
 

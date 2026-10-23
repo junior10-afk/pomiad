@@ -85,11 +85,15 @@ les valeurs techniques. Tokens en `oklch`, neutres teintés olive, aucun noir pu
 
 ## Ce qui dépend de la clé
 
+Aucun texte n'est généré sans modèle : c'est un choix produit, pas une limite technique. Pomelli ne
+produit pas de copie sans son modèle non plus. Sans clé, l'app extrait le site, affiche le profil et
+s'arrête là — elle ne fabrique pas de slogan de secours.
+
 | Sans clé | Avec clé |
 |---|---|
-| DNA par règles | DNA réécrit par le modèle (marque, promesse, audience, ton) |
-| 3 angles par gabarits | 3 angles écrits, ton respecté, longueurs contraintes |
-| 10 commandes d'édition | langage naturel libre |
+| site lu, palette et polices extraites | + marque, promesse, audience et ton réécrits par le modèle |
+| campagnes : écran d'attente, pas de texte | 3 angles écrits, ton respecté, longueurs contraintes |
+| édition au prompt désactivée | langage naturel libre |
 | créas vectoriels | fond photographique généré |
 
 ## Règle de probité

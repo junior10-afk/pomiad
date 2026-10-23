@@ -15,6 +15,9 @@ et sont simplement ignorées.
 | **Anthropic** | [console.anthropic.com](https://console.anthropic.com/settings/keys) | ✅ vérifié |
 | **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | ❌ bloqué par CORS |
 
+Sans clé, l'app n'écrit rien : elle lit le site et affiche le profil, puis s'arrête. Les campagnes
+et l'édition au prompt demandent un modèle — c'est volontaire, il n'y a pas de texte de secours.
+
 Les clés vont dans le `localStorage` de **ton** navigateur et partent directement vers le
 fournisseur. Elles ne transitent jamais par le serveur de l'app. **Tout effacer** les supprime.
 

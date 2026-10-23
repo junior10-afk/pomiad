@@ -387,62 +387,6 @@
   /* copie                                                               */
   /* ------------------------------------------------------------------ */
 
-  const ANGLES = [
-    {
-      id: 'manifeste',
-      label: 'Manifeste',
-      headlines: [
-        '{brand} ne suit pas la tendance.',
-        'Le détail avant le bruit.',
-        'On ne fait pas dans le générique.',
-        'Fait pour durer, pas pour la vitrine.'
-      ],
-      subs: ['{offer}', 'Ce qui compte, c\'est ce qui reste après la mode.'],
-      ctas: ['Découvrir {brand}', 'Entrer']
-    },
-    {
-      id: 'produit',
-      label: 'Produit',
-      headlines: [
-        '{offer}',
-        'Ce qui change tout, c\'est le détail.',
-        'Conçu pour tenir. Pensé pour rester.'
-      ],
-      subs: ['Regarde de près : c\'est là que ça se joue.', '{brand}, sans compromis.'],
-      ctas: ['Voir la pièce', 'Explorer']
-    },
-    {
-      id: 'preuve',
-      label: 'Preuve',
-      headlines: [
-        'Ils sont revenus. Pas par hasard.',
-        'Trois ans plus tard, toujours là.',
-        'La qualité se remarque à l\'usage.'
-      ],
-      subs: ['{offer}', 'Aucune campagne ne remplace un client qui revient.'],
-      ctas: ['Lire l\'histoire', 'Voir les avis']
-    }
-  ];
-
-  function fill(tpl, dna) {
-    return tpl
-      .replace(/\{brand\}/g, dna.brand)
-      .replace(/\{offer\}/g, dna.offer);
-  }
-
-  function makeCampaigns(dna, seedOffset) {
-    const tones = (dna.tone && dna.tone.length) ? dna.tone : ['sobre'];
-    const rng = mulberry32(hash32(dna.brand + tones.join('')) + (seedOffset || 0));
-    return ANGLES.map((angle, i) => ({
-      angle: angle.label,
-      headline: fill(pick(angle.headlines, rng), dna),
-      sub: fill(pick(angle.subs, rng), dna),
-      cta: fill(pick(angle.ctas, rng), dna),
-      kicker: tones[i % tones.length].toUpperCase(),
-      layout: i % 3
-    }));
-  }
-
   /* ------------------------------------------------------------------ */
   /* rendu canvas                                                        */
   /* ------------------------------------------------------------------ */
@@ -799,6 +743,7 @@
 
   const serverLLM = () => !!(API.caps && API.caps.llm && API.caps.llm.configured);
   const localLLM = () => typeof window.PomiLLM !== 'undefined' && window.PomiLLM.configured();
+  const anyLLM = () => localLLM() || serverLLM();
   const imageReady = () => !!(API.caps && API.caps.image && API.caps.image.configured);
 
   function updateServerBadge() {
@@ -815,7 +760,7 @@
       badge.classList.add('is-live');
       return;
     }
-    badge.textContent = 'gabarits locaux';
+    badge.textContent = 'aucun modèle';
     badge.classList.remove('is-live');
   }
 
@@ -1160,6 +1105,39 @@
     };
   }
 
+  function renderGate() {
+    const grid = $('#camp-grid');
+    const form = $('#custom-form');
+    if (form) form.hidden = true;
+    grid.innerHTML = '';
+
+    const box = document.createElement('div');
+    box.className = 'gate';
+
+    const h = document.createElement('h3');
+    h.textContent = 'Les campagnes sont écrites par le modèle';
+
+    const p1 = document.createElement('p');
+    p1.textContent = 'Cette app ne compose aucun texte toute seule. Les trois angles sont rédigés par un ' +
+      'modèle de langage, avec le ton de voix du profil. Sans modèle, il n\'y a rien à montrer — et c\'est volontaire.';
+
+    const p2 = document.createElement('p');
+    p2.className = 'gate-note';
+    p2.textContent = 'Ajoute une clé Gemini dans Réglages. Une minute, et tout le reste suit.';
+
+    const btn = document.createElement('button');
+    btn.className = 'primary';
+    btn.type = 'button';
+    btn.textContent = 'Ouvrir les réglages';
+    btn.addEventListener('click', () => $('#btn-settings').click());
+
+    box.appendChild(h);
+    box.appendChild(p1);
+    box.appendChild(p2);
+    box.appendChild(btn);
+    grid.appendChild(box);
+  }
+
   async function renderCampaigns() {
     const d = state.dna;
     $('#camp-brand').textContent = d.brand;
@@ -1189,11 +1167,19 @@
       }
     }
 
-    state.campaigns = camps || makeCampaigns(d, 0);
+    if (!camps) {
+      state.campaigns = [];
+      renderGate();
+      return;
+    }
+
+    state.campaigns = camps;
     if (state.custom) state.campaigns[0] = state.custom;
 
     const grid = $('#camp-grid');
     grid.innerHTML = '';
+    const form = $('#custom-form');
+    if (form) form.hidden = false;
 
     state.campaigns.forEach((camp, i) => {
       const card = document.createElement('button');
@@ -1336,63 +1322,6 @@
     return null;
   }
 
-  function localApplyPrompt(raw) {
-    const text = raw.toLowerCase().trim();
-    const c = state.creative;
-    const p = state.dna.palette;
-    let applied = '';
-
-    if (!text) return;
-
-    if (/^(titre|headline)\s*[:=]/.test(text)) {
-      c.headline = raw.split(/[:=]/).slice(1).join(':').trim();
-      $('#f-headline').value = c.headline;
-      applied = 'titre remplacé';
-    } else if (/(titre|texte|headline).*(plus grand|plus gros|agrandi)/.test(text) || /^plus grand/.test(text)) {
-      c.scale = clamp(c.scale * 1.15, 0.5, 1.7);
-      applied = 'titre agrandi ×' + c.scale.toFixed(2);
-    } else if (/(titre|texte|headline).*(plus petit|rédui|redui)/.test(text) || /^plus petit/.test(text)) {
-      c.scale = clamp(c.scale * 0.87, 0.5, 1.7);
-      applied = 'titre réduit ×' + c.scale.toFixed(2);
-    } else if (/(enlève|retire|supprime).*(bouton|cta)/.test(text)) {
-      c.showCta = false;
-      applied = 'bouton retiré';
-    } else if (/(ajoute|met).*(bouton|cta)/.test(text)) {
-      c.showCta = true;
-      applied = 'bouton ajouté';
-    } else if (/(fond|background|arrière).*(clair)/.test(text)) {
-      p.bg = hexToHsl(p.bg).l < 50 ? hslToHex(hexToHsl(p.bg).h, hexToHsl(p.bg).s, 22) : hslToHex(hexToHsl(p.bg).h, 10, 96);
-      applied = 'fond éclairci';
-    } else if (/(fond|background|arrière).*(sombre|foncé|fonce)/.test(text)) {
-      p.bg = hslToHex(hexToHsl(p.bg).h, Math.max(8, hexToHsl(p.bg).s), 9);
-      applied = 'fond assombri';
-    } else if (/(fond|background|arrière)/.test(text) && findColor(text)) {
-      p.bg = findColor(text);
-      applied = 'fond → ' + p.bg;
-    } else if (/(couleur|accent|primaire)/.test(text) && findColor(text)) {
-      p.primary = findColor(text);
-      applied = 'couleur principale → ' + p.primary;
-    } else if (/(autre|change|variante|différent|different).*(disposition|layout|mise en page)/.test(text) || /^(variante|autre)/.test(text)) {
-      c.layout = (c.layout + 1) % 3;
-      applied = 'disposition ' + (c.layout + 1) + '/3';
-    } else if (/(kicker|sur-titre|surtitre|eyebrow)/.test(text) && /[:=]/.test(raw)) {
-      c.kicker = raw.split(/[:=]/).slice(1).join(':').trim().toUpperCase();
-      $('#f-kicker').value = c.kicker;
-      applied = 'sur-titre remplacé';
-    } else if (/(cta|bouton)/.test(text) && /[:=]/.test(raw)) {
-      c.cta = raw.split(/[:=]/).slice(1).join(':').trim();
-      $('#f-cta').value = c.cta;
-      applied = 'bouton remplacé';
-    } else {
-      c.layout = (c.layout + 1) % 3;
-      applied = 'commande non reconnue → variante de disposition';
-    }
-
-    $('#edit-log').textContent = applied;
-    renderMiniSwatches();
-    redraw();
-  }
-
   function applyPatch(patch) {
     if (!patch) return;
     const c = state.creative;
@@ -1464,7 +1393,7 @@
       }
     }
 
-    localApplyPrompt(raw);
+    $('#edit-log').textContent = 'l\'édition au prompt nécessite un modèle — ouvre Réglages.';
   }
 
   /* ------------------------------------------------------------------ */
@@ -1538,6 +1467,10 @@
 
     $('#custom-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!anyLLM()) {
+        renderGate();
+        return;
+      }
       const v = $('#custom-input').value.trim();
       if (!v) return;
       state.custom = {
