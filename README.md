@@ -104,5 +104,16 @@ toujours la source réelle du DNA.
 
 ## Dev
 
-`dev/e2e.cjs` — parcours Playwright complet (serveur → DNA → campagnes → studio → prompt).
-`dev/test.cjs` — même parcours sans serveur (repli local). `dev/live.cjs` / `dev/dump.cjs` — captures.
+Tous les scripts tournent en Playwright headless contre le serveur local sur `8787`.
+
+| Script | Ce qu'il vérifie |
+|---|---|
+| `dev/e2e.cjs` | parcours complet : analyse → profil → campagnes → studio → prompt |
+| `dev/mock.cjs` | le même parcours avec un **faux modèle** injecté (`page.route`) — vérifie que les textes viennent bien du LLM |
+| `dev/gate.cjs` | sans clé : aucune carte, écran d'attente affiché |
+| `dev/idea.cjs` | idée libre → campagne écrite par le modèle |
+| `dev/degraded.cjs` | quota épuisé / réseau coupé : messages d'erreur lisibles |
+| `dev/settings2.cjs` | clés, sélection de modèle, test |
+| `dev/models.cjs` | filtrage du catalogue par capacité (Gemini mocké) |
+| `dev/browser-key.cjs` | appel du fournisseur depuis le navigateur avec la clé de `.env` |
+| `dev/appbar.cjs`, `dev/resp.cjs`, `dev/shots.cjs` | barre du haut, responsive, captures |
