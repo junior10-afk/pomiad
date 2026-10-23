@@ -111,6 +111,7 @@ Tous les scripts tournent en Playwright headless contre le serveur local sur `87
 | `dev/e2e.cjs` | parcours complet : analyse → profil → campagnes → studio → prompt |
 | `dev/mock.cjs` | le même parcours avec un **faux modèle** injecté (`page.route`) — vérifie que les textes viennent bien du LLM |
 | `dev/gate.cjs` | sans clé : aucune carte, écran d'attente affiché |
+| `dev/studio.cjs` | variantes de disposition, changement de format, export des 4 PNG |
 | `dev/idea.cjs` | idée libre → campagne écrite par le modèle |
 | `dev/degraded.cjs` | quota épuisé / réseau coupé : messages d'erreur lisibles |
 | `dev/settings2.cjs` | clés, sélection de modèle, test |
