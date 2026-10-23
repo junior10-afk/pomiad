@@ -366,7 +366,24 @@
     'concrètes, sans jargon marketing, sans superlatif creux, sans emoji. Tu respectes le ton de voix fourni ' +
     'et tu ne promets rien que la marque ne puisse tenir. Tu écris en français.';
 
-  function campaignsPrompt(dna) {
+  function campaignsPrompt(dna, idea) {
+    if (idea) {
+      return {
+        system: SYSTEM_CAMPAIGN,
+        user: 'Marque : ' + dna.brand + '\n' +
+          'Ce qu\'elle vend : ' + dna.offer + '\n' +
+          'Audience : ' + dna.audience + '\n' +
+          'Ton de voix : ' + (dna.tone || []).join(', ') + '\n\n' +
+          'L\'utilisateur a une idée précise pour cette campagne :\n« ' + String(idea).slice(0, 300) + ' »\n\n' +
+          'Écris UNE campagne qui sert exactement cette idée, dans le ton de la marque.\n\n' +
+          'Réponds avec ce JSON exactement :\n' +
+          '{ "campaigns": [\n' +
+          '  { "angle": "Sur mesure", "kicker": "1-2 MOTS EN MAJUSCULES", "headline": "max 52 caractères", "sub": "max 90 caractères", "cta": "2-3 mots", "layout": 1 }\n' +
+          '] }\n\n' +
+          'Contraintes strictes : headline ≤ 52 caractères, sub ≤ 90, cta ≤ 24, kicker ≤ 18 ; ' +
+          'aucun emoji, aucun #hashtag, aucun point d\'exclamation, aucun chiffre inventé.'
+      };
+    }
     const user = 'Marque : ' + dna.brand + '\n' +
       'Ce qu\'elle vend : ' + dna.offer + '\n' +
       'Audience : ' + dna.audience + '\n' +

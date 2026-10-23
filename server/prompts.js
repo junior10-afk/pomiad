@@ -39,7 +39,29 @@ const SYSTEM_CAMPAIGN = `Tu es concepteur-rédacteur publicitaire. Tu écris des
 concrètes, sans jargon marketing, sans superlatif creux, sans emoji. Tu respectes le ton de voix fourni
 et tu ne promets rien que la marque ne puisse tenir. Tu écris en français.`;
 
-function campaignsPrompt(dna) {
+function campaignsPrompt(dna, idea) {
+  if (idea) {
+    return {
+      system: SYSTEM_CAMPAIGN,
+      user: `Marque : ${dna.brand}
+Ce qu'elle vend : ${dna.offer}
+Audience : ${dna.audience}
+Ton de voix : ${(dna.tone || []).join(', ')}
+
+L'utilisateur a une idée précise pour cette campagne :
+« ${String(idea).slice(0, 300)} »
+
+Écris UNE campagne qui sert exactement cette idée, dans le ton de la marque.
+
+Réponds avec ce JSON exactement :
+{ "campaigns": [
+  { "angle": "Sur mesure", "kicker": "1-2 MOTS EN MAJUSCULES", "headline": "max 52 caractères", "sub": "max 90 caractères", "cta": "2-3 mots", "layout": 1 }
+] }
+
+Contraintes strictes : headline ≤ 52 caractères, sub ≤ 90, cta ≤ 24, kicker ≤ 18 ;
+aucun emoji, aucun #hashtag, aucun point d'exclamation, aucun chiffre inventé.`
+    };
+  }
   const user = `Marque : ${dna.brand}
 Ce qu'elle vend : ${dna.offer}
 Audience : ${dna.audience}

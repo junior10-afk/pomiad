@@ -85,6 +85,7 @@ async function handleAnalyze(body) {
   const signals = await crawl(url, cfg.crawl);
   let dna = null;
   let source = 'live';
+  let warning = null;
 
   if (llm.textStatus().configured) {
     try {
@@ -105,6 +106,7 @@ async function handleAnalyze(body) {
       }
     } catch (err) {
       console.warn('[analyze] LLM indisponible :', err.message);
+      warning = err.message;
     }
   }
 
@@ -127,6 +129,7 @@ async function handleAnalyze(body) {
   return {
     dna,
     source,
+    warning,
     signals: {
       title: signals.title,
       description: signals.description,
@@ -152,10 +155,11 @@ async function handleCampaigns(body) {
   const dna = body.dna;
   if (!dna || !dna.brand) throw Object.assign(new Error('DNA manquant'), { status: 400 });
   if (!llm.textStatus().configured) throw Object.assign(new Error('Aucune clé LLM configurée'), { status: 501 });
-  const p = prompts.campaignsPrompt(dna);
+  const idea = body.idea ? String(body.idea).slice(0, 300) : null;
+  const p = prompts.campaignsPrompt(dna, idea);
   const out = await llm.completeJSON(p.system, p.user, 1400);
   if (!out || !Array.isArray(out.campaigns)) throw new Error('Réponse du modèle inexploitable');
-  const campaigns = out.campaigns.slice(0, 3).map((c, i) => ({
+  const campaigns = out.campaigns.slice(0, idea ? 1 : 3).map((c, i) => ({
     angle: clip(c.angle || ['Manifeste', 'Produit', 'Preuve'][i], 24),
     kicker: clip(c.kicker || '', 24).toUpperCase(),
     headline: clip(c.headline || '', 90),

@@ -975,6 +975,7 @@
 
     let dna = null;
     let signals = null;
+    let modelWarning = null;
 
     if (API.base !== null) {
       try {
@@ -982,6 +983,7 @@
         if (res) {
           signals = res.signals || null;
           dna = res.dna || null;
+          modelWarning = res.warning || null;
         }
       } catch (err) {
         console.warn('analyse serveur :', err.message);
@@ -1015,6 +1017,8 @@
 
     state.dna = dna;
     renderDna();
+    const warn = $('#dna-warning');
+    if (warn) warn.textContent = modelWarning ? shortError(modelWarning) : '';
     upsertBrand();
     show('s-dna');
   }
@@ -1094,6 +1098,17 @@
 
   /* ---------- campagnes ---------- */
 
+  function shortError(message) {
+    const m = String(message || '');
+    if (/quota|429|rate limit|exceeded/i.test(m)) {
+      return 'Quota du modèle épuisé — le palier gratuit est limité et sera réinitialisé. Active la facturation chez le fournisseur pour lever la limite.';
+    }
+    if (/API key not valid|401|403|unauthor/i.test(m)) return 'Clé refusée par le fournisseur — vérifie-la dans Réglages.';
+    if (/CORS/i.test(m)) return 'Appel bloqué par le navigateur (CORS) — utilise Gemini, ou passe par la clé serveur.';
+    if (/fetch failed|timeout|ETIMEDOUT|ECONN|ENOTFOUND/i.test(m)) return 'Le serveur n\'a pas pu joindre le fournisseur (réseau).';
+    return m.length > 160 ? m.slice(0, 157) + '…' : m;
+  }
+
   function clipText(value, max) {
     const s = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
     if (s.length <= max) return s;
@@ -1113,7 +1128,7 @@
     };
   }
 
-  function renderGate() {
+  function renderGate(failure) {
     const grid = $('#camp-grid');
     const form = $('#custom-form');
     if (form) form.hidden = true;
@@ -1136,12 +1151,21 @@
     const btn = document.createElement('button');
     btn.className = 'primary';
     btn.type = 'button';
-    btn.textContent = 'Ouvrir les réglages';
-    btn.addEventListener('click', () => $('#btn-settings').click());
+    btn.textContent = anyLLM() ? 'Réessayer' : 'Ouvrir les réglages';
+    btn.addEventListener('click', () => {
+      if (anyLLM()) renderCampaigns();
+      else $('#btn-settings').click();
+    });
 
     box.appendChild(h);
     box.appendChild(p1);
-    box.appendChild(p2);
+    if (failure) {
+      const p3 = document.createElement('p');
+      p3.className = 'gate-note';
+      p3.textContent = shortError(failure);
+      box.appendChild(p3);
+    }
+    if (!anyLLM()) box.appendChild(p2);
     box.appendChild(btn);
     grid.appendChild(box);
   }
@@ -1151,6 +1175,7 @@
     $('#camp-brand').textContent = d.brand;
 
     let camps = null;
+    let failure = null;
 
     if (localLLM()) {
       $('#camp-grid').innerHTML = '<p class="loading-note">Le modèle écrit trois angles…</p>';
@@ -1162,6 +1187,7 @@
         }
       } catch (err) {
         console.warn('campagnes (modèle) :', err.message);
+        failure = err.message;
       }
     }
 
@@ -1172,12 +1198,13 @@
         if (res && Array.isArray(res.campaigns) && res.campaigns.length) camps = res.campaigns;
       } catch (err) {
         console.warn('campagnes :', err.message);
+        failure = failure || err.message;
       }
     }
 
     if (!camps) {
       state.campaigns = [];
-      renderGate();
+      renderGate(failure);
       return;
     }
 
@@ -1481,14 +1508,43 @@
       }
       const v = $('#custom-input').value.trim();
       if (!v) return;
-      state.custom = {
-        angle: 'Sur mesure',
-        headline: v.charAt(0).toUpperCase() + v.slice(1),
-        sub: state.dna.offer,
-        cta: 'Découvrir',
-        kicker: (state.dna.tone[0] || 'sobre').toUpperCase(),
-        layout: 1
-      };
+
+      const log = $('#custom-log');
+      log.textContent = 'le modèle écrit cette campagne…';
+      $('#camp-grid').innerHTML = '<p class="loading-note">Le modèle écrit cette campagne…</p>';
+
+      let camp = null;
+
+      if (localLLM()) {
+        try {
+          const p = window.PomiLLM.prompts.campaigns(state.dna, v);
+          const out = await window.PomiLLM.completeJSON(p.system, p.user, 900);
+          if (out && Array.isArray(out.campaigns) && out.campaigns.length) {
+            camp = normalizeCampaign(out.campaigns[0], 0);
+          }
+        } catch (err) {
+          console.warn('campagne sur mesure (modèle) :', err.message);
+        }
+      }
+
+      if (!camp && serverLLM()) {
+        try {
+          const res = await apiPost('/api/campaigns', { dna: state.dna, idea: v }, 60000);
+          if (res && Array.isArray(res.campaigns) && res.campaigns.length) camp = res.campaigns[0];
+        } catch (err) {
+          console.warn('campagne sur mesure :', err.message);
+        }
+      }
+
+      if (!camp) {
+        log.textContent = 'le modèle n\'a rien renvoyé — réessaie.';
+        await renderCampaigns();
+        return;
+      }
+
+      log.textContent = '';
+      $('#custom-input').value = '';
+      state.custom = camp;
       await renderCampaigns();
       openStudio(0);
     });
